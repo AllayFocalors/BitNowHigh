@@ -2,3 +2,4 @@
 *.exe
 /.idea
 video.mp4
+/__pycache__/
