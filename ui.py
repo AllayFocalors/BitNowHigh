@@ -1,3 +1,5 @@
+# 用户界面模块
+
 import tkinter as tk
 from tkinter import ttk, messagebox, filedialog
 from PIL import Image, ImageTk
@@ -7,6 +9,7 @@ from fractions import Fraction
 import cv2
 import os
 import webbrowser
+
 
 def get_video_info_opencv(video_path):
     """
@@ -125,18 +128,31 @@ class VideoEditorUI:
         section_frame.pack(fill = tk.X, pady = 5)
 
         # 文件选择按钮和显示
-        file_frame = ttk.Frame(section_frame)
-        file_frame.pack(fill = tk.X, pady = 5)
+        srcfile_frame = ttk.Frame(section_frame)
+        srcfile_frame.pack(fill = tk.X, pady = 5)
 
-        self.file_entry = ttk.Entry(file_frame, state = 'readonly', width = 50)
+        self.file_entry = ttk.Entry(srcfile_frame, state = 'readonly', width = 50)
         self.file_entry.pack(side = tk.LEFT, fill = tk.X, expand = True, padx = (0, 10))
 
         browse_btn = ttk.Button(
-            file_frame,
-            text = "浏览...",
+            srcfile_frame,
+            text = "浏览源文件...",
             command = self.browse_file
         )
         browse_btn.pack(side = tk.RIGHT)
+
+        outfile_frame = ttk.Frame(section_frame)
+        outfile_frame.pack(fill = tk.X, pady = 5)
+
+        self.Etr_output_filepath = ttk.Entry(outfile_frame, state = 'readonly', width = 50)
+        self.Etr_output_filepath.pack(side = tk.LEFT, fill = tk.X, expand = True, padx = (0, 10))
+        browse_btn = ttk.Button(
+            outfile_frame,
+            text = "浏览导出路径...",
+            command = self.browse_output_dir
+        )
+        browse_btn.pack(side = tk.RIGHT)
+
 
     def create_file_info(self):
         section_frame = ttk.LabelFrame(
@@ -148,8 +164,6 @@ class VideoEditorUI:
 
         self.Lab_video_info = ttk.Label(section_frame,text="点击“浏览”并选择视频以查看信息", justify="left")
         self.Lab_video_info.pack(fill=tk.X)
-        # print(video_info := get_video_info_opencv(self.selected_file))
-
 
 
     def create_output_settings(self):
@@ -300,6 +314,17 @@ class VideoEditorUI:
             # 更新视频信息展示
             self.update_video_info()
 
+    def browse_output_dir(self):
+        self.output_dir = filedialog.askdirectory(
+            title = "选择导出目录"
+        )
+        if self.output_dir:
+            self.Etr_output_filepath.config(state = 'normal')
+            self.Etr_output_filepath.delete(0, tk.END)
+            self.Etr_output_filepath.insert(0, self.output_dir)
+            self.Etr_output_filepath.config(state = 'readonly')
+            print("Selected output directory:", self.output_dir)
+
     def update_video_info(self):
         video_info = get_video_info_opencv(self.selected_file)
         video_info = f'''帧宽度：{video_info['width']}
@@ -352,21 +377,28 @@ class VideoEditorUI:
 
         # 显示确认对话框
         resolution_info = f"缩放倍数: {scale_factor:.1f}倍" if resolution_mode == "scale" else f"分辨率: {width}x{height}"
-        confirmation = (
-            f"确认导出设置:\n\n"
-            f"视频文件: {self.selected_file}\n"
-            f"{resolution_info}\n"
-            f"画质: {int(quality)}\n"
-            f"分辨率：{width}x{height}\n"
-            f"倍速: {speed:.1f}倍\n"
-            f"编码: {codec}\n\n"
-            f"是否开始导出视频?"
-        )
+        confirmation = (f'''
+确认导出设置:
+视频文件: {self.selected_file}
+导出目录：{self.output_dir}
+{resolution_info}
+画质: {int(quality)}
+分辨率：{width}x{height}
+倍速: {speed:.1f}倍
+编码: {codec}\n
+是否开始导出视频?
+提示：
+FFmpeg主要使用的是CPU，请确保CPU性能足够！
+''')
+        if int(quality) <= 10:
+            confirmation += '\n您选择的画质过高，请确保硬盘预留足够的空间！'
+        if int(width) * int(height) >= 1920*1080*16:
+            confirmation += '\n您选择的分辨率过大，已超过8K规格，请确保硬盘预留足够的空间，并确保CPU与运存性能足够！'
 
         if messagebox.askyesno("确认导出", confirmation):
             messagebox.showinfo("导出开始", "视频导出过程已开始，请稍候...")
             print('start generating')
-            outfilepath = './output_videos/'#这里的路径一定一定要以斜杠作为末尾
+            outfilepath = self.output_dir#这里的路径一定一定要以斜杠作为末尾
             outfilename = 'output'
             if not os.path.exists(outfilepath):
                 os.mkdir(outfilepath)

@@ -1,4 +1,7 @@
+# 视频生成与导出模块
+
 import subprocess, pathlib, sys, os
+
 def generate(srcfilepath,outfilename='output',outfilepath='./',width=1920,height=1080,qual=30,encoder="libx264"):
     '''
     生成视频
@@ -10,6 +13,8 @@ def generate(srcfilepath,outfilename='output',outfilepath='./',width=1920,height
     :param encoder:str,编码器，默认为libx264。有两个选择：'libx264'与'libx265'，前者效率高体积大
     :return: dict,按照以下格式存储信息：{'code':'000','err':none,}，000表示顺利完成
     '''
+    if outfilepath[-1] != '/':
+        outfilepath += '/'
     outfilepath=fr"{outfilepath}{outfilename}[{qual}-{width}x{height}].mp4"
     src = pathlib.Path(srcfilepath)
     dst = pathlib.Path(outfilepath)
