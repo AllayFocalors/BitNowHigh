@@ -1,14 +1,16 @@
 # 用户界面模块
 
-import tkinter as tk
+from future.backports.email.utils import encode_rfc2231
 from tkinter import ttk, messagebox, filedialog
-from PIL import Image, ImageTk
-import os
-import BitNowHigh as bnh
 from fractions import Fraction
+from PIL import Image, ImageTk
+import BitNowHigh as bnh
+import tkinter as tk
+import subprocess
+import webbrowser
+import pathlib
 import cv2
 import os
-import webbrowser
 
 
 def get_video_info_opencv(video_path):
@@ -73,11 +75,12 @@ class VideoEditorUI:
     def __init__(self, root):
         self.root = root
         self.root.title("哪炸闹海 BitNowHigh")
-        self.root.geometry("900x700")
+        self.root.geometry("900x1000")
         self.root.resizable(True, True)
 
         # 初始化变量（提前定义）
         self.selected_file = ""
+        self.output_dir = ""
         self.resolution_mode = tk.StringVar(value = "scale")
         self.scale_factor = tk.DoubleVar(value = 1.0)
         self.custom_width = tk.IntVar(value = 1920)
@@ -85,27 +88,18 @@ class VideoEditorUI:
         self.quality = tk.IntVar(value = 30)
         self.speed = tk.DoubleVar(value = 1.0)
         self.codec = tk.StringVar(value = "H.264")
+        self.GPUOn = tk.BooleanVar(value = False)
+        self.fps = tk.Variable(value = 30.0)
 
-        # 创建主框架
         self.main_frame = ttk.Frame(root, padding = 10)
         self.main_frame.pack(fill = tk.BOTH, expand = True)
 
-        # 创建标题
         self.create_header()
-
-        # 创建文件选择区域
         self.create_file_selection()
-
-        # 创建显示视频信息区域
         self.create_file_info()
-
-        # 创建输出设置区域
         self.create_output_settings()
-
-
-
-
-        # 创建按钮区域
+        self.create_code_options()
+        self.create_command_show()
         self.create_action_buttons()
 
     def create_header(self):
@@ -128,31 +122,32 @@ class VideoEditorUI:
         section_frame.pack(fill = tk.X, pady = 5)
 
         # 文件选择按钮和显示
-        srcfile_frame = ttk.Frame(section_frame)
-        srcfile_frame.pack(fill = tk.X, pady = 5)
+        Frm_srcfile = ttk.Frame(section_frame)
+        Frm_srcfile.pack(fill = tk.X, pady = 5)
 
-        self.file_entry = ttk.Entry(srcfile_frame, state = 'readonly', width = 50)
-        self.file_entry.pack(side = tk.LEFT, fill = tk.X, expand = True, padx = (0, 10))
+        self.Ent_file = ttk.Entry(Frm_srcfile, state = 'readonly', width = 50)
+        self.Ent_file.pack(side = tk.LEFT, fill = tk.X, expand = True, padx = (0, 10))
 
-        browse_btn = ttk.Button(
-            srcfile_frame,
+        But_browseSrc = ttk.Button(
+            Frm_srcfile,
             text = "浏览源文件...",
-            command = self.browse_file
+            width = 15,
+            command = self.browse_file,
         )
-        browse_btn.pack(side = tk.RIGHT)
+        But_browseSrc.pack(side = tk.RIGHT)
 
-        outfile_frame = ttk.Frame(section_frame)
-        outfile_frame.pack(fill = tk.X, pady = 5)
+        Frm_outfile = ttk.Frame(section_frame)
+        Frm_outfile.pack(fill = tk.X, pady = 5)
 
-        self.Etr_output_filepath = ttk.Entry(outfile_frame, state = 'readonly', width = 50)
-        self.Etr_output_filepath.pack(side = tk.LEFT, fill = tk.X, expand = True, padx = (0, 10))
-        browse_btn = ttk.Button(
-            outfile_frame,
+        self.Ent_output_filepath = ttk.Entry(Frm_outfile, state = 'readonly', width = 50)
+        self.Ent_output_filepath.pack(side = tk.LEFT, fill = tk.X, expand = True, padx = (0, 10))
+        But_browseOut = ttk.Button(
+            Frm_outfile,
             text = "浏览导出路径...",
-            command = self.browse_output_dir
+            width = 15,
+            command = self.browse_output_dir,
         )
-        browse_btn.pack(side = tk.RIGHT)
-
+        But_browseOut.pack(side = tk.RIGHT)
 
     def create_file_info(self):
         section_frame = ttk.LabelFrame(
@@ -162,130 +157,234 @@ class VideoEditorUI:
         )
         section_frame.pack(fill = tk.X, pady = 5)
 
-        self.Lab_video_info = ttk.Label(section_frame,text="点击“浏览”并选择视频以查看信息", justify="left")
-        self.Lab_video_info.pack(fill=tk.X)
-
+        self.Lab_video_info = ttk.Label(section_frame, text = "点击“浏览”并选择视频以查看信息", justify = "left")
+        self.Lab_video_info.pack(fill = tk.X)
 
     def create_output_settings(self):
         section_frame = ttk.LabelFrame(
             self.main_frame,
-            text = "输出设置",
+            text = "编辑选项",
             padding = (15, 10)
         )
         section_frame.pack(fill = tk.X, pady = 5)
 
-        # 分辨率设置
-        res_frame = ttk.Frame(section_frame)
-        res_frame.pack(fill = tk.X, pady = 5)
+        Frm_basename = ttk.Frame(section_frame)
+        Frm_basename.pack(fill = tk.X, pady = 5)
 
-        res_label = ttk.Label(res_frame, text = "分辨率设置:", width = 15, anchor = tk.W)
-        res_label.pack(side = tk.LEFT)
+        Lab_fileBaseName = ttk.Label(Frm_basename, text = "文件名:", width = 15, anchor = tk.W)
+        Lab_fileBaseName.pack(side = tk.LEFT)
 
-        # 分辨率模式选择
-        mode_frame = ttk.Frame(res_frame)
-        mode_frame.pack(side = tk.LEFT, padx = 10)
+        self.Ent_fileBaseName = ttk.Entry(Frm_basename, width = 20)
+        self.Ent_fileBaseName.pack(side = tk.LEFT, fill = tk.X, expand = True)
 
+        Frm_res = ttk.Frame(section_frame)
+        Frm_res.pack(fill = tk.X, pady = 5)
 
-        custom_frame = ttk.Frame(mode_frame)
-        custom_frame.pack(fill = tk.X, padx = (20, 0), pady = 2,side='left')
-        # 按比例缩放功能开发中
-        # Lab_scale = ttk.Label(mode_frame,text="缩放倍数:")
-        # Lab_scale.pack(side='left')
-        #
-        # scale_frame = ttk.Frame(mode_frame)
-        # scale_frame.pack(fill = tk.X, padx = (20, 0), pady = 2)
-        #
-        # Scl_scale = ttk.Scale(
-        #     scale_frame,
-        #     from_ = 0.1,
-        #     to = 24.0,
-        #     variable = self.scale_factor,
-        #     length = 150
-        # )
-        # Scl_scale.pack(side='left',padx=20)
-        # # scale_entry = ttk.Entry(scale_frame, textvariable = self.scale_factor, width = 8)
-        # # scale_entry.pack(side = tk.LEFT)
-        # Lab_scale_value=ttk.Label(scale_frame, text = "倍")
-        # Lab_scale_value.pack(side = tk.LEFT, padx = (5, 0))
-        # self.scale_factor.trace_add("write", self.update_scale_label)
+        Lab_res = ttk.Label(Frm_res, text = "分辨率设置:", width = 15, anchor = tk.W)
+        Lab_res.pack(side = tk.LEFT)
 
+        Frm_mode = ttk.Frame(Frm_res)
+        Frm_mode.pack(side = tk.LEFT, padx = 0)
 
-        width_entry = ttk.Entry(custom_frame, textvariable = self.custom_width, width = 6)
-        width_entry.pack(side = tk.LEFT)
-        ttk.Label(custom_frame, text = "x").pack(side = tk.LEFT, padx = 5)
-        height_entry = ttk.Entry(custom_frame, textvariable = self.custom_height, width = 6)
-        height_entry.pack(side = tk.LEFT)
+        Frm_custom = ttk.Frame(Frm_mode)
+        Frm_custom.pack(fill = tk.X, padx = (5, 0), pady = 2, side = 'left')
+
+        Ent_width = ttk.Entry(Frm_custom, textvariable = self.custom_width, width = 6)
+        Ent_width.pack(side = tk.LEFT)
+        ttk.Label(Frm_custom, text = "x").pack(side = tk.LEFT, padx = 0)
+        Ent_height = ttk.Entry(Frm_custom, textvariable = self.custom_height, width = 6)
+        Ent_height.pack(side = tk.LEFT)
 
         # 画质设置
-        quality_frame = ttk.Frame(section_frame)
-        quality_frame.pack(fill = tk.X, pady = 5)
+        Frm_quality = ttk.Frame(section_frame)
+        Frm_quality.pack(fill = tk.X, pady = 5)
 
-        quality_label = ttk.Label(quality_frame, text = "视频画质:", width = 15, anchor = tk.W)
-        quality_label.pack(side = tk.LEFT)
+        Lab_quality = ttk.Label(Frm_quality, text = "视频画质:", width = 15, anchor = tk.W)
+        Lab_quality.pack(side = tk.LEFT)
 
-        quality_scale = ttk.Scale(
-            quality_frame,
+        Scl_quality = ttk.Scale(
+            Frm_quality,
             from_ = 1,
             to = 51,
             variable = self.quality,
             length = 200
         )
-        quality_scale.pack(side = tk.LEFT, padx = 10)
+        Scl_quality.pack(side = tk.LEFT, padx = 10)
 
-        self.quality_value = ttk.Label(quality_frame, text = "30", width = 3)
-        self.quality_value.pack(side = tk.LEFT)
+        self.Lab_quality_value = ttk.Label(Frm_quality, text = "30", width = 3)
+        self.Lab_quality_value.pack(side = tk.LEFT)
         self.quality.trace_add("write", self.update_quality_label)
 
         # 倍速设置
-        speed_frame = ttk.Frame(section_frame)
-        speed_frame.pack(fill = tk.X, pady = 5)
+        Frm_speed = ttk.Frame(section_frame)
+        Frm_speed.pack(fill = tk.X, pady = 5)
 
-        speed_label = ttk.Label(speed_frame, text = "播放倍速:（开发中）", width = 15, anchor = tk.W)
-        speed_label.pack(side = tk.LEFT)
+        Lab_speed = ttk.Label(Frm_speed, text = "播放倍速:", width = 15, anchor = tk.W)
+        Lab_speed.pack(side = tk.LEFT)
 
-        speed_entry = ttk.Entry(speed_frame, textvariable = self.speed, width = 8)
-        speed_entry.pack(side = tk.LEFT, padx = 10)
-        ttk.Label(speed_frame, text = "倍 (0.5 - 6400)").pack(side = tk.LEFT)
+        Ent_speed = ttk.Entry(Frm_speed, textvariable = self.speed, width = 8)
+        Ent_speed.pack(side = tk.LEFT, padx = 10)
+        ttk.Label(Frm_speed, text = "倍 (0.5 - 6400)").pack(side = tk.LEFT)
+
+        Frm_fps = ttk.Frame(section_frame)
+        Frm_fps.pack(fill = tk.X, pady = 5)
+
+        Lab_fps = ttk.Label(Frm_fps, text = '帧率(fps)', width = 15, anchor = tk.W)
+        Lab_fps.pack(side = tk.LEFT)
+
+        self.Ent_fps = ttk.Entry(Frm_fps, textvariable = self.fps, width = 8)
+        self.Ent_fps.pack(side = tk.LEFT, padx = 10)
 
         # 编码设置
-        codec_frame = ttk.Frame(section_frame)
-        codec_frame.pack(fill = tk.X, pady = 5)
 
-        codec_label = ttk.Label(codec_frame, text = "视频编码:", width = 15, anchor = tk.W)
-        codec_label.pack(side = tk.LEFT)
+    def printgpu(self):
+        print(self.GPUOn)
 
-        codec_combo = ttk.Combobox(
-            codec_frame,
+    def create_code_options(self):
+        section_frame = ttk.LabelFrame(
+            self.main_frame,
+            text = "编码选项",
+            padding = (15, 10)
+        )
+        section_frame.pack(fill = tk.X, pady = 5)
+
+        Frm_codec = ttk.Frame(section_frame)
+        Frm_codec.pack(fill = tk.X, pady = 5)
+
+        Lab_codec = ttk.Label(Frm_codec, text = "视频编码:", width = 15, anchor = tk.W)
+        Lab_codec.pack(side = tk.LEFT)
+
+        Cmb_codec = ttk.Combobox(
+            Frm_codec,
             textvariable = self.codec,
             width = 18,
             state = "readonly"
         )
-        codec_combo['values'] = ("H.264", "H.265")
-        codec_combo.pack(side = tk.LEFT, padx = 10)
+        Cmb_codec['values'] = ("H.264", "H.265", "AV1")
+        Cmb_codec.pack(side = tk.LEFT, padx = 10)
+
+        Frm_graphic = ttk.LabelFrame(section_frame, text = "硬件加速:")
+        Frm_graphic.pack(fill = tk.X, pady = 5)
+
+        Ckb_GPUOn = ttk.Checkbutton(Frm_graphic, text = "使用GPU加速", variable = self.GPUOn, command = self.printgpu)
+        Ckb_GPUOn.pack(side = tk.LEFT)
+
+    def gene_cmd(self):
+        if not self.selected_file:
+            messagebox.showerror("错误", "请先选择一个视频文件！")
+            return
+        if not self.output_dir:
+            messagebox.showerror("错误", "请先选择一个输出目录！")
+            return
+        # 获取设置
+        resolution_mode = self.resolution_mode.get()
+        scale_factor = self.scale_factor.get()
+        width = self.custom_width.get()
+        height = self.custom_height.get()
+        quality = self.quality.get()
+        speed = self.speed.get()
+        codec = self.codec.get()
+        basename = self.Ent_fileBaseName.get()
+        fps = float(self.Ent_fps.get())
+
+        if basename == "":
+            basename = os.path.basename(self.selected_file)
+
+        # 验证输入
+        errors = []
+        if resolution_mode == "scale" and (scale_factor <= 0 or scale_factor > 10):
+            errors.append("缩放倍数必须在0.1到10之间")
+        if resolution_mode == "custom" and (width <= 0 or height <= 0):
+            errors.append("分辨率宽高必须大于0")
+        if speed < 0.5 or speed > 6400.0:
+            errors.append("播放倍速必须在0.5到6400之间")
+
+        if errors:
+            messagebox.showerror("输入错误", "\n".join(errors))
+            return
+
+        outfilepath = self.output_dir  # 这里的路径一定一定要以斜杠作为末尾
+        outfilename = basename
+        if not os.path.exists(outfilepath):
+            os.mkdir(outfilepath)
+
+        if self.GPUOn:
+            encoder = (
+                    (codec == 'H.264') * 'h264_qsv' +
+                    (codec == 'H.265') * 'hevc_qsv' +
+                    (codec == 'AV1') * 'av1_qsv'
+            )
+        else:
+            encoder = (
+                    (codec == 'H.264') * 'libx264' +
+                    (codec == 'H.265') * 'libx265' +
+                    (codec == 'AV1') * 'libsvtav1'
+            )
+        code = bnh.generate_command(
+            srcfilepath = self.selected_file,
+            outfilename = outfilename,
+            outfilepath = outfilepath,
+            width = width,
+            height = height,
+            fps = fps,
+            speed = speed,
+            qual = quality,
+            encoder = encoder
+        )
+        return code
+
+    def create_command_show(self):
+        section_frame = ttk.LabelFrame(
+            self.main_frame,
+            text = "命令预览",
+            padding = (15, 10)
+        )
+        section_frame.pack(fill = tk.X, pady = 5)
+
+        Frm_text = ttk.Frame(section_frame)
+        Frm_text.pack(fill = tk.X, expand = True, side = tk.LEFT)
+
+        self.Txt_cmdshow = tk.Text(
+            Frm_text,
+            height = 3,
+            width = 50,
+            wrap = tk.WORD,  # 自动换行
+            state = 'disabled',
+            font = ("consolas", 10),
+        )
+        self.Txt_cmdshow.pack(side = tk.LEFT, fill = tk.X, expand = True)
+
+        # 添加滚动条
+        Sbr_cmdshow = ttk.Scrollbar(Frm_text, orient = tk.VERTICAL, command = self.Txt_cmdshow.yview)
+        Sbr_cmdshow.pack(side = tk.RIGHT, fill = tk.Y)
+        self.Txt_cmdshow.config(yscrollcommand = Sbr_cmdshow.set)
+
+        But_gene_cmd = ttk.Button(section_frame, text = "生成指令", command = self.update_cmdshow, width = 15)
+        But_gene_cmd.pack(side = tk.RIGHT, padx = 10)
 
     def create_action_buttons(self):
-        button_frame = ttk.Frame(self.main_frame)
-        button_frame.pack(fill = tk.X, pady = 20)
+        Frm_button = ttk.Frame(self.main_frame)
+        Frm_button.pack(fill = tk.X, pady = 20)
 
         # 导出按钮
-        export_btn = ttk.Button(
-            button_frame,
+        But_export = ttk.Button(
+            Frm_button,
             text = "导出视频",
-            
+
             padding = 10,
             command = self.export_video
         )
-        export_btn.pack(side = tk.RIGHT, padx = 10)
+        But_export.pack(side = tk.RIGHT, padx = 10)
 
         # 开发者按钮
-        dev_btn = ttk.Button(
-            button_frame,
+        But_dev = ttk.Button(
+            Frm_button,
             text = "By AllayCloud",
-            
+
             padding = 10,
             command = self.show_developer_info
         )
-        dev_btn.pack(side = tk.RIGHT)
+        But_dev.pack(side = tk.RIGHT)
 
     def browse_file(self):
         filetypes = (
@@ -305,13 +404,12 @@ class VideoEditorUI:
                 return
 
             self.selected_file = file_path
-            self.file_entry.config(state = 'normal')
-            self.file_entry.delete(0, tk.END)
-            self.file_entry.insert(0, file_path)
-            self.file_entry.config(state = 'readonly')
+            self.Ent_file.config(state = 'normal')
+            self.Ent_file.delete(0, tk.END)
+            self.Ent_file.insert(0, file_path)
+            self.Ent_file.config(state = 'readonly')
             print("Selected file:", file_path)
             print(get_video_info_opencv(file_path))
-            # 更新视频信息展示
             self.update_video_info()
 
     def browse_output_dir(self):
@@ -319,26 +417,27 @@ class VideoEditorUI:
             title = "选择导出目录"
         )
         if self.output_dir:
-            self.Etr_output_filepath.config(state = 'normal')
-            self.Etr_output_filepath.delete(0, tk.END)
-            self.Etr_output_filepath.insert(0, self.output_dir)
-            self.Etr_output_filepath.config(state = 'readonly')
+            self.Ent_output_filepath.config(state = 'normal')
+            self.Ent_output_filepath.delete(0, tk.END)
+            self.Ent_output_filepath.insert(0, self.output_dir)
+            self.Ent_output_filepath.config(state = 'readonly')
             print("Selected output directory:", self.output_dir)
 
     def update_video_info(self):
         video_info = get_video_info_opencv(self.selected_file)
+        self.Ent_fps.delete(0, tk.END)
+        self.Ent_fps.insert(0, video_info['fps'])
         video_info = f'''帧宽度：{video_info['width']}
 帧高度：{video_info['height']}
-画幅比例：{video_info['aspect_ratio']} ({int(video_info['aspect_ratio'].split(':')[0])/int(video_info['aspect_ratio'].split(':')[1]):.2f}:1)
+画幅比例：{video_info['aspect_ratio']} ({int(video_info['aspect_ratio'].split(':')[0]) / int(video_info['aspect_ratio'].split(':')[1]):.2f}:1)
 长度：{video_info['duration_formatted']}
 视频大小：{video_info['file_size_formatted']}
 帧速率：{video_info['fps']}
 帧数量：{video_info['frame_count']}
 '''
-
         self.Lab_video_info.config(text = video_info)
 
-    def update_scale_label(self):#功能开发中
+    def update_scale_label(self):  # 功能开发中
         # 获取当前缩放值并更新标签
         scale_value = self.scale_factor.get()
         # 如果 Lab_scale_value 存在则更新它
@@ -346,7 +445,19 @@ class VideoEditorUI:
             self.Lab_scale_value.config(text = f"{scale_value:.1f}x")
 
     def update_quality_label(self, *args):
-        self.quality_value.config(text = str(int(self.quality.get())))
+        self.Lab_quality_value.config(text = str(int(self.quality.get())))
+
+    def update_cmdshow(self):
+        '''更新cmd展示，这会在点击“生成代码”时被调用'''
+        try:
+            text = ' '.join(self.gene_cmd())
+        except:
+            return
+
+        self.Txt_cmdshow.config(state = 'normal')  # 临时启用以修改文本
+        self.Txt_cmdshow.delete(1.0, tk.END)  # 清空所有文本
+        self.Txt_cmdshow.insert(tk.END, text)  # 插入新文本
+        self.Txt_cmdshow.config(state = 'disabled')  # 恢复禁用状态
 
     def export_video(self):
         if not self.selected_file:
@@ -361,16 +472,13 @@ class VideoEditorUI:
         quality = self.quality.get()
         speed = self.speed.get()
         codec = self.codec.get()
+        fps = float(self.Ent_fps.get())
 
-        # 验证输入
         errors = []
-        if resolution_mode == "scale" and (scale_factor <= 0 or scale_factor > 10):
-            errors.append("缩放倍数必须在0.1到10之间")
         if resolution_mode == "custom" and (width <= 0 or height <= 0):
             errors.append("分辨率宽高必须大于0")
-        if speed < 0.5 or speed > 6400.0:
-            errors.append("播放倍速必须在0.5到6400之间")
-
+        if speed < 0.5 or speed > 12800.0:
+            errors.append("播放倍速必须在0.5到12800之间")
         if errors:
             messagebox.showerror("输入错误", "\n".join(errors))
             return
@@ -380,62 +488,56 @@ class VideoEditorUI:
         confirmation = (f'''
 确认导出设置:
 视频文件: {self.selected_file}
-导出目录：{self.output_dir}
+导出目录：{self.output_dir}{(int(not (bool(len(self.output_dir)))) * '由于您没有选择导出目录，视频将会放置在程序运行根目录')}
 {resolution_info}
-画质: {int(quality)}
+画质: {int(quality)}（数字越高码率越低）
 分辨率：{width}x{height}
+帧率：{fps}
 倍速: {speed:.1f}倍
 编码: {codec}\n
 是否开始导出视频?
 提示：
-FFmpeg主要使用的是CPU，请确保CPU性能足够！
+若未启用GPU加速，FFmpeg对CPU算力要求较高，请确保CPU性能足够！
 ''')
+
         if int(quality) <= 10:
             confirmation += '\n您选择的画质过高，请确保硬盘预留足够的空间！'
-        if int(width) * int(height) >= 1920*1080*16:
+        if int(width) * int(height) >= 1920 * 1080 * 16:
             confirmation += '\n您选择的分辨率过大，已超过8K规格，请确保硬盘预留足够的空间，并确保CPU与运存性能足够！'
 
         if messagebox.askyesno("确认导出", confirmation):
             messagebox.showinfo("导出开始", "视频导出过程已开始，请稍候...")
             print('start generating')
-            outfilepath = self.output_dir#这里的路径一定一定要以斜杠作为末尾
-            outfilename = 'output'
-            if not os.path.exists(outfilepath):
-                os.mkdir(outfilepath)
-            code = bnh.generate(
-                self.selected_file,
-                outfilename,
-                outfilepath=outfilepath,
-                width=width,
-                height=height,
-                qual=quality,
-                encoder = ((codec=='H.264')*'libx264'+(codec=='H.265')*'libx265')
+            cmd = self.gene_cmd()
+            proc = subprocess.Popen(
+                cmd,
+                encoding = "utf-8",
+                stdout = subprocess.PIPE,
+                stderr = subprocess.STDOUT,
+                text = True,
+                bufsize = 1
             )
+            for line in proc.stdout:
+                print(line, end = '')
+            proc.wait()
+            dst = pathlib.Path(self.output_dir)
             print('done')
-            print(code)
-            if code['code'] == '000':
-                if os.path.isfile(code['file']):
-                    messagebox.showinfo("导出完成", f"视频导出完成！已放在目录{outfilepath}下。感谢使用哪炸闹海！\n（去B站给悦灵一个关注好嘛？）")
-                    webbrowser.open('https://space.bilibili.com/660052393')
-                else:
-                    messagebox.showerror("导出失败", "视频导出被异常中断，请检查终端输出内容。")
-            else:
-                messagebox.showerror("导出失败", f"视频导出失败！信息：{code}")
+            messagebox.showinfo("导出完成",
+                                f"视频导出完成！已放在目录{self.output_dir}下。感谢使用哪炸闹海！\n（去B站给悦灵一个关注好嘛？）")
+            webbrowser.open('https://space.bilibili.com/660052393')
 
     def show_developer_info(self):
         info = (
-'''哪炸闹海 BitNowHigh
-AllayCloud 2025
-> By AllayCloud-Studio: 
->    AllayFocalors
-> Bilibili@悦灵AllayFocalors
-> GitHub: https://github.com/AllayFocalors/BitNowHigh
-该项目基于 Apache 2.0 License 开源
-悦灵云工作室保留所有权利
-'''
-            )
+            '''哪炸闹海 BitNowHigh
+            AllayCloud 2025
+            > By AllayCloud-Studio: AllayFocalors
+            > Bilibili@悦灵AllayFocalors
+            > GitHub仓库: https://github.com/AllayFocalors/BitNowHigh
+            该项目基于 MIT License 开源
+            悦灵云工作室保留所有权利
+            '''
+        )
         messagebox.showinfo("开发者信息", info)
-
 
 
 if __name__ == "__main__":

@@ -7,3 +7,4 @@ build/ui/COLLECT-00.toc
 /build/
 /packaged/
 *.spec
+__pycache__/BitNowHigh.cpython-312.pyc
