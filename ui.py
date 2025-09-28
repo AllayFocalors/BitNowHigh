@@ -12,6 +12,7 @@ import pathlib
 import cv2
 import os
 
+VERSION='0.1.2'
 
 def get_video_info_opencv(video_path):
     """
@@ -70,15 +71,13 @@ def get_video_info_opencv(video_path):
         'frame_count': frame_count
     }
 
-
 class VideoEditorUI:
     def __init__(self, root):
         self.root = root
         self.root.title("哪炸闹海 BitNowHigh")
-        self.root.geometry("900x1000")
+        self.root.geometry("900x800")
         self.root.resizable(True, True)
 
-        # 初始化变量（提前定义）
         self.selected_file = ""
         self.output_dir = ""
         self.resolution_mode = tk.StringVar(value = "scale")
@@ -94,13 +93,45 @@ class VideoEditorUI:
         self.main_frame = ttk.Frame(root, padding = 10)
         self.main_frame.pack(fill = tk.BOTH, expand = True)
 
+        self.create_scrollable_area()
+
         self.create_header()
         self.create_file_selection()
-        self.create_file_info()
-        self.create_output_settings()
-        self.create_code_options()
-        self.create_command_show()
+
+        self.create_scrollable_content()
+        self.pack_scrollable_area()
+
         self.create_action_buttons()
+
+    def pack_scrollable_area(self):
+        self.canvas.pack(side="left", fill="both", expand=True)
+        self.scrollbar.pack(side="right", fill="y")
+
+    def create_scrollable_area(self):
+        self.canvas = tk.Canvas(self.main_frame)
+        self.scrollbar = ttk.Scrollbar(self.main_frame, orient="vertical", command=self.canvas.yview)
+        self.scrollable_frame = ttk.Frame(self.canvas)
+        self.scrollable_frame.bind(
+            "<Configure>",
+            lambda e: self.canvas.configure(
+                scrollregion=self.canvas.bbox("all")
+            )
+        )
+        self.canvas.create_window((0, 0), window=self.scrollable_frame, anchor="nw")
+        self.canvas.configure(yscrollcommand=self.scrollbar.set)
+        def _on_mousewheel(event):
+            self.canvas.yview_scroll(int(-1 * (event.delta / 120)), "units")
+
+        self.canvas.bind_all("<MouseWheel>", _on_mousewheel)
+        self.scrollable_frame.bind("<MouseWheel>", _on_mousewheel)
+
+        def _configure_canvas(event):
+            canvas_width = event.width
+            self.canvas.itemconfig(self.canvas.find_all()[0], width=canvas_width)
+
+        self.canvas.bind("<Configure>", _configure_canvas)
+
+
 
     def create_header(self):
         header_frame = ttk.Frame(self.main_frame)
@@ -108,7 +139,7 @@ class VideoEditorUI:
 
         header_label = ttk.Label(
             header_frame,
-            text = "BitNowHigh",
+            text = f"哪炸闹海用户界面程序 BitNowHigh-UI-v{VERSION} BNH-v{BitNowHigh.VERSION}",
             padding = 10
         )
         header_label.pack(side = tk.LEFT, fill = tk.X, expand = True)
@@ -120,11 +151,8 @@ class VideoEditorUI:
             padding = (15, 10)
         )
         section_frame.pack(fill = tk.X, pady = 5)
-
-        # 文件选择按钮和显示
         Frm_srcfile = ttk.Frame(section_frame)
         Frm_srcfile.pack(fill = tk.X, pady = 5)
-
         self.Ent_file = ttk.Entry(Frm_srcfile, state = 'readonly', width = 50)
         self.Ent_file.pack(side = tk.LEFT, fill = tk.X, expand = True, padx = (0, 10))
 
@@ -149,9 +177,15 @@ class VideoEditorUI:
         )
         But_browseOut.pack(side = tk.RIGHT)
 
+    def create_scrollable_content(self):
+        self.create_file_info()
+        self.create_output_settings()
+        self.create_code_options()
+        self.create_command_show()
+
     def create_file_info(self):
         section_frame = ttk.LabelFrame(
-            self.main_frame,
+            self.scrollable_frame,
             text = "视频信息",
             padding = (15, 10)
         )
@@ -162,7 +196,7 @@ class VideoEditorUI:
 
     def create_output_settings(self):
         section_frame = ttk.LabelFrame(
-            self.main_frame,
+            self.scrollable_frame,
             text = "编辑选项",
             padding = (15, 10)
         )
@@ -215,7 +249,6 @@ class VideoEditorUI:
         self.Lab_quality_value.pack(side = tk.LEFT)
         self.quality.trace_add("write", self.update_quality_label)
 
-        # 倍速设置
         Frm_speed = ttk.Frame(section_frame)
         Frm_speed.pack(fill = tk.X, pady = 5)
 
@@ -235,14 +268,13 @@ class VideoEditorUI:
         self.Ent_fps = ttk.Entry(Frm_fps, textvariable = self.fps, width = 8)
         self.Ent_fps.pack(side = tk.LEFT, padx = 10)
 
-        # 编码设置
 
     def printgpu(self):
         print(self.GPUOn)
 
     def create_code_options(self):
         section_frame = ttk.LabelFrame(
-            self.main_frame,
+            self.scrollable_frame,
             text = "编码选项",
             padding = (15, 10)
         )
@@ -276,7 +308,6 @@ class VideoEditorUI:
         if not self.output_dir:
             messagebox.showerror("错误", "请先选择一个输出目录！")
             return
-        # 获取设置
         resolution_mode = self.resolution_mode.get()
         scale_factor = self.scale_factor.get()
         width = self.custom_width.get()
@@ -290,7 +321,6 @@ class VideoEditorUI:
         if basename == "":
             basename = os.path.basename(self.selected_file)
 
-        # 验证输入
         errors = []
         if resolution_mode == "scale" and (scale_factor <= 0 or scale_factor > 10):
             errors.append("缩放倍数必须在0.1到10之间")
@@ -335,7 +365,7 @@ class VideoEditorUI:
 
     def create_command_show(self):
         section_frame = ttk.LabelFrame(
-            self.main_frame,
+            self.scrollable_frame,
             text = "命令预览",
             padding = (15, 10)
         )
@@ -354,7 +384,6 @@ class VideoEditorUI:
         )
         self.Txt_cmdshow.pack(side = tk.LEFT, fill = tk.X, expand = True)
 
-        # 添加滚动条
         Sbr_cmdshow = ttk.Scrollbar(Frm_text, orient = tk.VERTICAL, command = self.Txt_cmdshow.yview)
         Sbr_cmdshow.pack(side = tk.RIGHT, fill = tk.Y)
         self.Txt_cmdshow.config(yscrollcommand = Sbr_cmdshow.set)
@@ -364,27 +393,27 @@ class VideoEditorUI:
 
     def create_action_buttons(self):
         Frm_button = ttk.Frame(self.main_frame)
-        Frm_button.pack(fill = tk.X, pady = 20)
+        Frm_button.pack(side=tk.RIGHT, anchor=tk.SE, pady = 20)
 
-        # 导出按钮
         But_export = ttk.Button(
             Frm_button,
             text = "导出视频",
-
             padding = 10,
             command = self.export_video
         )
-        But_export.pack(side = tk.RIGHT, padx = 10)
+        But_export.pack(side = tk.TOP, pady = (0,10))
 
-        # 开发者按钮
         But_dev = ttk.Button(
             Frm_button,
             text = "By AllayCloud",
-
             padding = 10,
             command = self.show_developer_info
         )
-        But_dev.pack(side = tk.RIGHT)
+        But_dev.pack(side = tk.TOP)
+
+    def pack_scrollable_area(self):
+        self.canvas.pack(side="left", fill="both", expand=True)
+        self.scrollbar.pack(side="right", fill="y")
 
     def browse_file(self):
         filetypes = (

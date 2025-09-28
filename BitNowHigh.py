@@ -12,6 +12,8 @@ import cv2
 import os
 import subprocess, pathlib, sys, os
 
+VERSION = '0.0.2'
+
 def generate_command(srcfilepath,outfilename='output',outfilepath='./',width=1920,height=1080,fps=60,qual=30,speed=1.0,encoder="libx264"):
     '''
     生成视频
