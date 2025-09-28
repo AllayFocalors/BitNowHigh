@@ -12,7 +12,7 @@ import pathlib
 import cv2
 import os
 
-VERSION='0.1.2'
+VERSION='0.1.2.1'
 
 def get_video_info_opencv(video_path):
     """
@@ -139,7 +139,7 @@ class VideoEditorUI:
 
         header_label = ttk.Label(
             header_frame,
-            text = f"哪炸闹海用户界面程序 BitNowHigh-UI-v{VERSION} BNH-v{BitNowHigh.VERSION}",
+            text = f"哪炸闹海用户界面程序 BitNowHigh-UI-v{VERSION} BNH-v{bnh.VERSION}",
             padding = 10
         )
         header_label.pack(side = tk.LEFT, fill = tk.X, expand = True)
