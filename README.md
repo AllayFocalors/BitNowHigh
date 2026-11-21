@@ -16,7 +16,7 @@ ui文件是ui.py,视频生成文件是BitNowHigh.py,各位可以自行将其加�
 > 当前设备不支持基于qsv的硬件加速，关闭“GPU加速”即可
  
 ### 3. 运行时报错`ModuleNotFoundError: No module named 'xxx'`
-> 缺少必要的模块，终端运行`pip install xxx`即可
+> 缺少必要的模块，终端运行`pip install -r requirements.txt`即可
  
 
 

@@ -1,0 +1,3 @@
+future
+pillow
+opencv-python
